@@ -1,0 +1,46 @@
+name: Jules Issue Auto Fix
+
+on:
+  issues:
+    types: [opened, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number for Jules to solve
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: jules-issue-fix-${{ github.repository }}-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  jules-fix:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.action != 'labeled' || github.event.label.name == 'jules' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke Jules issue solver
+        uses: google-labs-code/jules-action@v1.0.0
+        with:
+          prompt: |
+            You are an issue-resolution agent.
+
+            Repository: ${{ github.repository }}
+            Issue number: ${{ github.event.issue.number || inputs.issue_number }}
+            Issue URL: ${{ github.event.issue.html_url || format('https://github.com/{0}/issues/{1}', github.repository, inputs.issue_number) }}
+
+            Task:
+            1. Triage the issue and identify root cause.
+            2. Implement a minimal safe fix.
+            3. Add or update tests when relevant.
+            4. Open a pull request with clear summary and risk notes.
+
+            Constraints:
+            - Do not introduce broad refactors.
+            - Keep changes focused to resolving this issue.
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
