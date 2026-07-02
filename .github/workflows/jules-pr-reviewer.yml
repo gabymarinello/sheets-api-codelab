@@ -1,0 +1,46 @@
+name: Jules PR Reviewer
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Optional PR number override for manual runs
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: jules-pr-review-${{ github.repository }}-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  jules-review:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke Jules review
+        uses: google-labs-code/jules-action@v1.0.0
+        with:
+          prompt: |
+            You are a pull request review agent.
+
+            Repository: ${{ github.repository }}
+            PR number: ${{ github.event.pull_request.number || inputs.pr_number }}
+            PR URL: ${{ github.event.pull_request.html_url || format('https://github.com/{0}/pull/{1}', github.repository, inputs.pr_number) }}
+
+            Review goals:
+            1. Find correctness, security, and reliability issues.
+            2. Highlight missing tests and risky changes.
+            3. Suggest minimal, high-impact fixes.
+            4. Keep feedback concise and actionable.
+
+            Output:
+            - Post review comments/findings directly on the PR.
+            - If no critical issues, state that clearly.
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
